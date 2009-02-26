@@ -1,0 +1,201 @@
+#!/usr/local/bin/perl
+# This is a script for generating ascii-art style graphs on the terminal
+#
+# Default size will be 24 rows, 80 columns
+
+use Getopt::Long qw(:config bundling);
+use Math::Round qw(nlowmult round);
+use List::Util qw(max);
+
+my $height = 24;
+my $width = 80;
+my $key = undef;
+my $value = 1;
+#TODO: 
+my $orientation = "vertical";
+my $help = undef;
+GetOptions('h=s' => \$height, 
+           'height=s' => \$height, 
+           'w=s'=> \$width, 
+           'width=s' => \$width,
+           'k=s' => \$key,
+           'key=s' => \$key,
+           'v=s' => \$value,
+           'value=s' => \$value,
+           'help' => \$help);
+
+my $usage = "Usage: ./asciiGraph [OPTIONS]\n"
+    ."Data is read from STDIN\n"
+    ."Options:\n"
+    ."    -h --height [NUM]     Set the height of the graph to NUM\n"
+    ."                            Default = $height\n"
+    ."    -w --width [NUM]      Set the width of the graph to NUM\n"
+    ."                            Default = $width\n"
+    ."    -v --value [NUM]      Specify which column to use as the data\n"
+    ."    -k --key [NUM]        Specify which column keys the data column\n"
+    ."    --help                Show this screen\n";
+
+if($help) {
+    die $usage;
+}
+
+my @buf = undef;
+
+# Init the buffer
+#  NOTE: $buf[y][x]
+foreach my $i (0..($height-1)) {
+    foreach my $j (0..($width-1)) {
+        $buf[$i][$j] = '.';
+    }
+}
+
+###################
+# DRAW THE GRAPH
+###################
+
+my @keys = ();
+my @values = ();
+
+my $maxVal = 0;
+my $minVal = 0;
+
+# Read stdin to get the data
+if(my $line = <>) {
+    $line = trim_ws($line);
+    my @line = split(/\s+/, $line);
+    push(@values, $line[($value - 1)]);
+    $maxVal = $line[$value-1];
+    $minVal = $line[$value-1];
+    push(@keys, $line[($key - 1)]);
+}
+while(my $line = <>) {
+    $line = trim_ws($line);
+    my @line = split(/\s+/, $line);
+    push(@values, $line[($value - 1)]);
+    push(@keys, $line[($key - 1)]);
+
+    # update max and min val
+    if($line[$value -1] > $maxVal) {
+        $maxVal = $line[$value-1];
+    }
+    if($line[$value -1] < $minVal) {
+        $minVal = $line[$value-1];
+    }
+}
+
+#TODO: split into horiz and vert versions
+
+# Determine the margins
+my $x0 = max(length($maxVal), length($minVal));
+my $y0 = 1;
+
+# Draw axes
+my @verts = ($x0);
+my @horiz = ($y0, ($y0 + 10), ($y0 + 20));
+foreach (@verts) {
+    foreach my $i (0..($height-1)) {
+        $buf[$i][$_] = '|';
+    }
+}
+foreach (@horiz) {
+    foreach my $i (0..($width-1)) {
+        if($buf[$_][$i] eq '|') {
+            $buf[$_][$i] = '+';
+        } else {
+            $buf[$_][$i] = '-';
+        }
+    }
+}
+
+# print the scale values
+my @minVal = split(//, $minVal);
+for(my $i=0; $i < length($minVal); $i++) {
+    $buf[$y0+1][$x0 - length($minVal) + $i] = $minVal[$i];
+}
+my @maxVal = split(//, $maxVal);
+for(my $i=0; $i < length($maxVal); $i++) {
+    $buf[$height-1][$x0 - length($maxVal) + $i] = $maxVal[$i];
+}
+
+# calculate chars per input unit
+my $scale = ($height - $y0 - 2) / ($maxVal - $minVal);
+
+# Draw the bars
+if(scalar(@values) > 0) {
+    my $datWidth = nlowmult(1, ($width-$x0-1)/scalar(@values));
+    
+    foreach my $i (0..(scalar(@values)-1)) {
+        my $xpos = $x0 + 1 + ($i * $datWidth);
+        my $ytop = $y0+1 + round(($values[$i] - $minVal) * $scale);
+        drawLine('#', $xpos, $y0+1, $xpos, $ytop);
+        for(my $j = 1; $j < $datWidth-1; $j++) {
+            drawLine('#', $xpos+$j, $y0+1, $xpos+$j, $ytop);
+        }
+    }
+}
+
+
+###################
+#Print the buffer
+# h,0 ... h,w
+#  .    .  .
+#  .   .   .
+#  .  .    .
+# 0,0 ... 0,w
+foreach my $i (0..($height-1)) {
+    $i = $height - 1 - $i;
+    foreach my $j (0..($width-1)) {
+        print STDOUT $buf[$i][$j];
+    }
+    print STDOUT "\n";
+}
+
+###################
+#SUBS
+###################
+sub trim_ws  {
+    my $in = shift;
+    chomp($in);
+    $in =~ s/^\s+//g;
+    $in =~ s/\s+$//g;
+    return $in;
+}
+
+sub drawLine {
+    my $char = shift;
+    my $x1 = shift;
+    my $y1 = shift;
+    my $x2 = shift;
+    my $y2 = shift;
+    
+    # Calculate the distance of the line in each dimension
+    #  and mark the larger dimension as the one we will
+    #  iterate over
+    my $diff = $x2 - $x1;
+    my $smallDiff = $y2 - $y1;
+    my $axis = 'x';
+    if($diff < $smallDiff) {
+        my $temp = $diff;
+        $diff = $smallDiff;
+        $smallDiff = $temp;
+        $axis = 'y';
+    }
+
+    # Loop on the larger dimension to draw chars
+    foreach my $i (0..$diff) {
+        # calculate the proporitonal offset of the small dimension
+        my $smallI;
+        if($diff > 0) {
+            $smallI = round(($i/$diff) * $smallDiff);
+        } else {
+            $smallI = 0;
+        }
+        
+        if($axis eq 'x') {
+            $buf[$y1 + $smallI][$x1 + $i] = $char;
+        } else {
+            $buf[$y1 + $i][$x1 + $smallI] = $char;
+        }
+    }
+}
+
