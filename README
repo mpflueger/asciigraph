@@ -2,7 +2,7 @@
 Author: Max Pflueger (mpflueger at gmail)
 
 asciiGraph is program designed to provide graphing functions displayed via
-ascii-art on the commad line.  Due to the limitations of ascii text it will
+ascii-art on the command line.  Due to the limitations of ascii text it will
 never produce graphs as precise or pretty as a program such as Matlab or 
 Mathematica, and it should not be considered a replacement for such programs.
 Rather, this is for all those times when you have some data in a file, or 
@@ -12,9 +12,9 @@ to via SSH.
 
 *Initial Version
   Right now asciiGraph will only draw vertical bar graphs based on a column
-  of data on standard in.  The height and width of the graph can be adjusted,
-  and the bars will scale automatically to fit the range of the data into
-  the dimensions of the graph.  The width of the bars will also be adjusted 
+  of data on standard input (STDIN).  The height and width of the graph can be 
+  adjusted, and the bars will scale automatically to fit the range of the data 
+  into the dimensions of the graph.  The width of the bars will also be adjusted 
   according to how many data points there are.
   
   --TODO--
